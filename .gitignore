@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.vercel/
+.firebase/
+firebase-debug.log
+*-debug.log
+service-account*.json
+.DS_Store
