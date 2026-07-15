@@ -21,19 +21,18 @@ const originSchema = z.string().transform((value, context) => {
   }
 });
 
-export function getRuntimeEnvironment(): {
-  port: number;
-  allowedOrigins: readonly string[];
-} {
+export function readConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): { port: number; allowedOrigins: readonly string[] } {
   const parsed = runtimeSchema.parse({
-    PORT: process.env.PORT,
-    ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+    PORT: env.PORT,
+    ALLOWED_ORIGINS: env.ALLOWED_ORIGINS,
   });
-  const values = parsed.ALLOWED_ORIGINS.split(",")
+  const origins = parsed.ALLOWED_ORIGINS.split(",")
     .map((value) => value.trim())
     .filter(Boolean);
   return {
     port: parsed.PORT,
-    allowedOrigins: z.array(originSchema).parse(values),
+    allowedOrigins: z.array(originSchema).parse(origins),
   };
 }

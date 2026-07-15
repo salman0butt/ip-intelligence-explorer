@@ -1,6 +1,7 @@
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
+import { readConfig } from "../src/config.js";
 import {
   ApiError,
   type LookupIp,
@@ -238,5 +239,32 @@ describe("HTTP safeguards", () => {
     });
     expect(JSON.stringify(response.body)).not.toContain("secret provider detail");
     expect(log).toHaveBeenCalled();
+  });
+});
+
+describe("runtime configuration", () => {
+  it("parses the port and comma-separated HTTP origins", () => {
+    expect(
+      readConfig({
+        PORT: "8080",
+        ALLOWED_ORIGINS: "http://localhost:5173, https://example.com/path",
+      }),
+    ).toEqual({
+      port: 8080,
+      allowedOrigins: ["http://localhost:5173", "https://example.com"],
+    });
+  });
+
+  it("uses local defaults", () => {
+    expect(readConfig({})).toEqual({
+      port: 3000,
+      allowedOrigins: ["http://localhost:5173"],
+    });
+  });
+
+  it("rejects non-HTTP origins", () => {
+    expect(() =>
+      readConfig({ ALLOWED_ORIGINS: "ftp://example.com" }),
+    ).toThrow("ALLOWED_ORIGINS contains an invalid HTTP(S) origin.");
   });
 });
