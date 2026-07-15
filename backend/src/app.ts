@@ -1,41 +1,75 @@
+import { randomUUID } from "node:crypto";
 import cors from "cors";
-import express, { type Express } from "express";
+import express, {
+  type ErrorRequestHandler,
+  type Express,
+  type Request,
+} from "express";
 import helmet from "helmet";
-import { createHealthRouter } from "./modules/health/health.routes.js";
-import { createIpIntelligenceRouter } from "./modules/ip-intelligence/ip-intelligence.routes.js";
-import type { IpIntelligenceService } from "./modules/ip-intelligence/ip-intelligence.service.js";
-import { ApplicationError } from "./shared/errors/application-error.js";
-import {
-  createErrorHandler,
-  createRequestContext,
-  type HttpLogger,
-} from "./shared/http/error-handler.js";
+import { ApiError, type LookupIp } from "./ip-intelligence.js";
 
-const quiet: HttpLogger = {
-  info: () => undefined,
-  error: () => undefined,
-};
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      requestId?: string;
+    }
+  }
+}
+
+function requestIdOf(request: Request): string {
+  return request.requestId ?? "unknown";
+}
+
+function parserErrorType(error: unknown): string | undefined {
+  return typeof error === "object" &&
+    error !== null &&
+    "type" in error &&
+    typeof error.type === "string"
+    ? error.type
+    : undefined;
+}
+
+function ipFromBody(body: unknown): string {
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    Array.isArray(body) ||
+    Object.keys(body).length !== 1 ||
+    !("ip" in body) ||
+    typeof body.ip !== "string"
+  ) {
+    throw new ApiError(
+      400,
+      "INVALID_REQUEST",
+      "Request body must contain only an IP value.",
+    );
+  }
+  return body.ip;
+}
 
 export function createApp({
-  lookupService,
+  lookup,
   allowedOrigins = [],
-  logger = quiet,
-  requestIdFactory,
-  healthClock,
+  clock = () => new Date(),
+  requestIdFactory = randomUUID,
 }: {
-  lookupService: Pick<IpIntelligenceService, "lookup">;
-  allowedOrigins?: readonly string[];
-  logger?: HttpLogger;
-  requestIdFactory?: () => string;
-  healthClock?: () => Date;
+  readonly lookup: LookupIp;
+  readonly allowedOrigins?: readonly string[];
+  readonly clock?: () => Date;
+  readonly requestIdFactory?: () => string;
 }): Express {
   const app = express();
   const allowed = new Set(allowedOrigins);
-  app.use(
-    createRequestContext(logger, {
-      ...(requestIdFactory ? { requestIdFactory } : {}),
-    }),
-  );
+
+  app.use((request, response, next) => {
+    const incoming = request.get("x-request-id") ?? "";
+    request.requestId = /^[A-Za-z0-9_-]{1,100}$/.test(incoming)
+      ? incoming
+      : requestIdFactory();
+    response.setHeader("x-request-id", request.requestId);
+    next();
+  });
   app.use(helmet());
   app.use(
     cors({
@@ -45,7 +79,7 @@ export function createApp({
           return;
         }
         callback(
-          new ApplicationError(
+          new ApiError(
             403,
             "ORIGIN_NOT_ALLOWED",
             "The request origin is not allowed.",
@@ -55,11 +89,63 @@ export function createApp({
     }),
   );
   app.use(express.json({ limit: "4kb" }));
-  app.use("/api/v1/health", createHealthRouter(healthClock));
-  app.use("/api/v1/ip-lookups", createIpIntelligenceRouter(lookupService));
-  app.use((_request, _response, next) => {
-    next(new ApplicationError(404, "NOT_FOUND", "Route not found."));
+
+  app.get("/api/v1/health", (_request, response) => {
+    response.json({
+      status: "ok",
+      service: "ip-intelligence-api",
+      timestamp: clock().toISOString(),
+    });
   });
-  app.use(createErrorHandler(logger));
+
+  app.post("/api/v1/ip-lookups", async (request, response) => {
+    response.status(200).json(
+      await lookup({
+        ip: ipFromBody(request.body as unknown),
+        requestId: requestIdOf(request),
+      }),
+    );
+  });
+
+  app.use((_request, _response, next) => {
+    next(new ApiError(404, "NOT_FOUND", "Route not found."));
+  });
+
+  const errorHandler: ErrorRequestHandler = (
+    error,
+    request,
+    response,
+    _next,
+  ) => {
+    void _next;
+    const known = error instanceof ApiError;
+    const type = parserErrorType(error);
+    const mapped = known
+      ? error
+      : type === "entity.parse.failed"
+        ? new ApiError(400, "MALFORMED_JSON", "Request body contains invalid JSON.")
+        : type === "entity.too.large"
+          ? new ApiError(
+              413,
+              "BODY_TOO_LARGE",
+              "Request body exceeds the 4 KB limit.",
+            )
+          : new ApiError(
+              500,
+              "INTERNAL_ERROR",
+              "An unexpected error occurred.",
+            );
+    if (!known && type !== "entity.parse.failed" && type !== "entity.too.large") {
+      console.error(error);
+    }
+    response.status(mapped.status).json({
+      error: {
+        code: mapped.code,
+        message: mapped.message,
+        requestId: requestIdOf(request),
+      },
+    });
+  };
+  app.use(errorHandler);
   return app;
 }
