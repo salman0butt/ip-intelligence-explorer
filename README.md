@@ -15,12 +15,14 @@ The frontend and backend are implemented and locally verified.
 - Concurrent GeoJS and RIPEstat requests with five-second timeouts
 - Stable complete or partial reports when at least one provider succeeds
 - Process-local TTL cache with same-IP in-flight request coalescing
-- Sanitized public errors and structured logs
+- Sanitized public errors with traceable request IDs
 - Deterministic frontend and backend smoke tests with no live provider calls
 
 ## Architecture
 
-`ip-intelligence` is one feature module containing its providers, schema, types, service, controller, and route. Shared code is limited to a generic memory cache, errors, and HTTP helpers.
+The backend intentionally uses six source files. `app.ts` owns the two HTTP routes and middleware, `ip-intelligence.ts` owns validation, orchestration, merging, and its lookup-specific cache, and `providers.ts` owns the three external integrations and response schemas. `config.ts`, `index.ts`, and `server.ts` handle runtime configuration, production composition, and local startup.
+
+The flat structure keeps the complete lookup path easy to follow without controller, service, repository, provider-class, or generic infrastructure layers. Provider functions remain separately testable because external responses are untrusted and change independently from the HTTP API.
 
 The cache is intentionally process-local. Redis, authentication, persistent history, and distributed rate limiting are possible production evolutions when measured traffic or user-owned data requires them; they are not requirements for this stateless version.
 
@@ -145,8 +147,8 @@ npm test
 npm run build
 ```
 
-Each workspace keeps one focused smoke-test file. Tests use fakes and make no
-live provider calls.
+The backend has focused API, lookup, and provider tests; the frontend keeps a
+user-flow smoke test. All tests use fakes and make no live provider calls.
 
 ## Deployment
 
