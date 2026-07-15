@@ -1,5 +1,6 @@
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import productionApp from "../api/index.js";
 import { createApp } from "../src/app.js";
 import { readConfig } from "../src/config.js";
 import {
@@ -59,7 +60,129 @@ function successfulLookup(): LookupIp {
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("production composition", () => {
+  it("uses all three upstream endpoints through the Vercel app", async () => {
+    const geoUrl = "https://get.geojs.io/v1/ip/geo/8.8.8.8.json";
+    const networkUrl =
+      "https://stat.ripe.net/data/network-info/data.json?resource=8.8.8.8&sourceapp=ip-intelligence-explorer";
+    const routingUrl =
+      "https://stat.ripe.net/data/routing-status/data.json?resource=8.8.8.8&sourceapp=ip-intelligence-explorer";
+    const payloads = new Map<string, unknown>([
+      [
+        geoUrl,
+        {
+          ip: "8.8.8.8",
+          city: "Mountain View",
+          region: "California",
+          country: "United States",
+          country_code: "US",
+          latitude: "37.386",
+          longitude: "-122.0838",
+          timezone: "America/Los_Angeles",
+          asn: 13_335,
+          organization: "AS15169 Google LLC",
+        },
+      ],
+      [
+        networkUrl,
+        {
+          status: "ok",
+          data: { prefix: "8.8.8.0/24", asns: ["15169"] },
+        },
+      ],
+      [
+        routingUrl,
+        {
+          status: "ok",
+          data: {
+            resource: "8.8.8.0/24",
+            query_time: fixedDate.toISOString(),
+            first_seen: null,
+            last_seen: {
+              prefix: "8.8.8.0/24",
+              origin: "15169",
+              time: "2026-07-16T11:00:00.000Z",
+            },
+            origins: [{ origin: "15169" }],
+            visibility: {
+              v4: { ris_peers_seeing: 100, total_ris_peers: 100 },
+              v6: { ris_peers_seeing: 0, total_ris_peers: 100 },
+            },
+          },
+        },
+      ],
+    ]);
+    const upstreamRequests: string[] = [];
+    const fetchStub: typeof fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      upstreamRequests.push(url);
+      const payload = payloads.get(url);
+      if (payload === undefined) {
+        throw new Error(`Unexpected upstream request: ${url}`);
+      }
+      return new Response(JSON.stringify(payload), {
+        headers: { "content-type": "application/json" },
+      });
+    };
+    vi.stubGlobal("fetch", vi.fn(fetchStub));
+
+    const response = await request(productionApp)
+      .post("/api/v1/ip-lookups")
+      .set("x-request-id", "production-composition")
+      .send({ ip: "8.8.8.8" });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      data: {
+        ip: "8.8.8.8",
+        location: {
+          city: "Mountain View",
+          region: "California",
+          country: "United States",
+          countryCode: "US",
+          latitude: 37.386,
+          longitude: -122.0838,
+          timezone: "America/Los_Angeles",
+        },
+        network: {
+          asn: 15_169,
+          organization: "Google LLC",
+          prefix: "8.8.8.0/24",
+        },
+        routing: {
+          announced: true,
+          queryTime: fixedDate.toISOString(),
+          firstSeen: null,
+          lastSeen: {
+            prefix: "8.8.8.0/24",
+            origin: 15_169,
+            time: "2026-07-16T11:00:00.000Z",
+          },
+          visibility: {
+            ipv4: { peersSeeing: 100, totalPeers: 100 },
+            ipv6: { peersSeeing: 0, totalPeers: 100 },
+          },
+        },
+      },
+      meta: {
+        status: "complete",
+        cached: false,
+        sources: {
+          geojs: "available",
+          ripestatNetwork: "available",
+          ripestatRouting: "available",
+        },
+        requestId: "production-composition",
+        lookedUpAt: expect.any(String),
+      },
+      warnings: [],
+    });
+    expect(upstreamRequests).toEqual([geoUrl, networkUrl, routingUrl]);
+  });
 });
 
 describe("health route", () => {
@@ -260,6 +383,10 @@ describe("runtime configuration", () => {
       port: 3000,
       allowedOrigins: ["http://localhost:5173"],
     });
+  });
+
+  it("rejects port zero", () => {
+    expect(() => readConfig({ PORT: "0" })).toThrow();
   });
 
   it("rejects non-HTTP origins", () => {

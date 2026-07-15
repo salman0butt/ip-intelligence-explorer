@@ -98,6 +98,17 @@ describe("RIPEstat providers", () => {
     });
   });
 
+  it("classifies invalid network information as unavailable", async () => {
+    await expect(
+      lookupRipeNetwork("8.8.8.8", {
+        fetchImpl: jsonFetch({ status: "ok", data: { asns: "15169" } }),
+      }),
+    ).rejects.toMatchObject({
+      source: "ripestat-network",
+      status: "unavailable",
+    });
+  });
+
   it("normalizes routing information", async () => {
     const result = await lookupRipeRouting("8.8.8.8", {
       fetchImpl: jsonFetch({
@@ -137,6 +148,17 @@ describe("RIPEstat providers", () => {
           ipv6: { peersSeeing: 0, totalPeers: 100 },
         },
       },
+    });
+  });
+
+  it("classifies invalid routing information as unavailable", async () => {
+    await expect(
+      lookupRipeRouting("8.8.8.8", {
+        fetchImpl: jsonFetch({ status: "ok", data: { resource: 123 } }),
+      }),
+    ).rejects.toMatchObject({
+      source: "ripestat-routing",
+      status: "unavailable",
     });
   });
 });

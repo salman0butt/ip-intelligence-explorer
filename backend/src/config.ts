@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const runtimeSchema = z.object({
-  PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
+  PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
   ALLOWED_ORIGINS: z.string().default("http://localhost:5173"),
 });
 
