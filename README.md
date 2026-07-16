@@ -20,7 +20,7 @@ The frontend and backend are implemented and locally verified.
 
 ## Architecture
 
-The backend intentionally uses six source files. `app.ts` owns the two HTTP routes and middleware, `ip-intelligence.ts` owns validation, orchestration, merging, and its lookup-specific cache, and `providers.ts` owns the three external integrations and response schemas. `config.ts`, `index.ts`, and `server.ts` handle runtime configuration, production composition, and local startup.
+The backend intentionally uses six source files. `create-app.ts` owns the two HTTP routes and middleware, `ip-intelligence.ts` owns validation, orchestration, merging, and its lookup-specific cache, and `providers.ts` owns the three external integrations and response schemas. `config.ts`, `index.ts`, and `local-server.ts` handle runtime configuration, production composition, and local startup.
 
 The flat structure keeps the complete lookup path easy to follow without controller, service, repository, provider-class, or generic infrastructure layers. Provider functions remain separately testable because external responses are untrusted and change independently from the HTTP API.
 
@@ -161,7 +161,7 @@ frontend project root to `frontend`, and choose Node.js 22 for each project.
 4. Set backend ALLOWED_ORIGINS to the exact deployed frontend origin and
    redeploy the backend.
 
-`backend/api/index.ts` is the Vercel entrypoint. `backend/src/server.ts` runs the same Express app locally.
+`backend/src/index.ts` is the Vercel Express entrypoint. `backend/src/local-server.ts` runs the same Express app locally.
 
 ## Data providers
 

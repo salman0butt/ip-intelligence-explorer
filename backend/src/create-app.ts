@@ -5,7 +5,7 @@ import express, {
   type Express,
   type Request,
 } from "express";
-import helmet from "helmet";
+import * as helmet from "helmet";
 import { ApiError, type LookupIp } from "./ip-intelligence.js";
 
 declare global {
@@ -70,7 +70,7 @@ export function createApp({
     response.setHeader("x-request-id", request.requestId);
     next();
   });
-  app.use(helmet());
+  app.use(helmet.default());
   app.use(
     cors({
       origin: (origin, callback) => {

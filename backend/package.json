@@ -7,8 +7,8 @@
     "node": ">=22.13.0 <23"
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
-    "start": "node --env-file-if-exists=.env dist/src/server.js",
+    "dev": "node --env-file-if-exists=.env --import tsx --watch src/local-server.ts",
+    "start": "node --env-file-if-exists=.env dist/src/local-server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",

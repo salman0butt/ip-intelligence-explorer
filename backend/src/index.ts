@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { createApp } from "./app.js";
+import { createApp } from "./create-app.js";
 import { readConfig } from "./config.js";
 import { createIpLookup } from "./ip-intelligence.js";
 import {
