@@ -1,4 +1,4 @@
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -44,5 +44,17 @@ describe("Vercel Express entrypoints", () => {
       .map(({ candidate }) => candidate);
 
     expect(existing).toEqual(["src/index.ts"]);
+  });
+
+  it("does not statically import Helmet in the Vercel-compiled app factory", async () => {
+    const appFactorySource = await readFile(
+      join(backendRoot, "src/create-app.ts"),
+      "utf8",
+    );
+
+    expect(appFactorySource).not.toMatch(
+      /import\s+(?:\*\s+as\s+helmet|helmet)\s+from\s+"helmet"/,
+    );
+    expect(appFactorySource).toContain("createRequire");
   });
 });

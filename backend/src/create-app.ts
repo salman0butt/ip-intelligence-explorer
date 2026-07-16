@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import cors from "cors";
 import express, {
   type ErrorRequestHandler,
   type Express,
   type Request,
+  type RequestHandler,
 } from "express";
-import * as helmet from "helmet";
 import { ApiError, type LookupIp } from "./ip-intelligence.js";
+
+const requireDependency = createRequire(import.meta.url);
+const helmet = requireDependency("helmet") as () => RequestHandler;
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -70,7 +74,7 @@ export function createApp({
     response.setHeader("x-request-id", request.requestId);
     next();
   });
-  app.use(helmet.default());
+  app.use(helmet());
   app.use(
     cors({
       origin: (origin, callback) => {
