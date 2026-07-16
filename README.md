@@ -2,9 +2,23 @@
 
 A full-stack IP intelligence application combining GeoJS geolocation with RIPEstat network and routing data. The strict-TypeScript React frontend presents a responsive Explorer Workspace, while the lean strict-TypeScript backend focuses on external API integration, typed data handling, partial-failure resilience, and simple deployment.
 
+[Live demo](https://ip-intelligence-explorer-frontend.vercel.app/) · [REST API](#rest-api) · [Local setup](#local-setup)
+
 ## Project status
 
-The frontend and backend are implemented and locally verified.
+The frontend and backend are deployed on Vercel and verified locally and in production.
+
+## Screenshots
+
+### Desktop
+
+![IP Intelligence Explorer desktop result for 8.8.8.8](docs/images/ip-intelligence-desktop.png)
+
+### Mobile
+
+<p align="center">
+  <img src="docs/images/ip-intelligence-mobile.png" alt="IP Intelligence Explorer mobile result for 8.8.8.8" width="320" />
+</p>
 
 ## Highlights
 
